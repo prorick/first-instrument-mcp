@@ -35,10 +35,19 @@ def seconds_since(iso_timestamp: str) -> str:
     return f"{delta.total_seconds():.0f} seconds ({delta})"
 
 @mcp.tool()
-def my_tool() -> str:
-    """YOURS. Rename it, give it a real purpose, make the model reach
-    something it couldn't before. (Track ideas: docs/TRACKS.md)"""
-    return "Not built yet — that's the point. Edit server.py."
+def percent_of_year_complete(date: str = "") -> str:
+    """Percentage of 2026 elapsed, as of now or a given ISO date (e.g. '2026-09-17')."""
+    year = 2026
+    start = datetime(year, 1, 1, tzinfo=timezone.utc)
+    end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+    if date:
+        when = datetime.fromisoformat(date)
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=timezone.utc)
+    else:
+        when = datetime.now(timezone.utc)
+    pct = (when - start).total_seconds() / (end - start).total_seconds() * 100
+    return f"{pct:.2f}% of {year} complete (as of {when.isoformat()})"
 
 if __name__ == "__main__":
     mcp.run(transport="streamable-http")
