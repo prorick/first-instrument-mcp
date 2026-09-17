@@ -48,12 +48,29 @@ def _format(t: dict, now: datetime) -> str:
     due_str = ""
     if t["due"]:
         due_str = f" — due {t['due']}" + (" (OVERDUE)" if overdue else "")
-    return f"{marker} {t['id']} {cat}{t['title']}{due_str}"
+    extras = []
+    difficulty = t.get("difficulty", 0)
+    if difficulty:
+        extras.append(f"difficulty {difficulty}/5")
+    hours = t.get("hours", 0)
+    if hours:
+        extras.append(f"~{hours:g}h")
+    extra_str = f" ({', '.join(extras)})" if extras else ""
+    return f"{marker} {t['id']} {cat}{t['title']}{due_str}{extra_str}"
 
 
 @mcp.tool()
-def add_task(title: str, category: str = "", due: str = "", notes: str = "", source: str = "manual") -> str:
-    """Add a task. due is an ISO date/datetime ('2026-09-22' or '2026-09-22T13:30'); leave blank if unknown."""
+def add_task(
+    title: str,
+    category: str = "",
+    due: str = "",
+    notes: str = "",
+    source: str = "manual",
+    difficulty: int = 0,
+    hours: float = 0,
+) -> str:
+    """Add a task. due is an ISO date/datetime ('2026-09-22' or '2026-09-22T13:30'); leave blank if unknown.
+    difficulty is 1 (easy) to 5 (hard), 0 if unset. hours is an estimated time-to-complete, 0 if unset."""
     tasks = _load()
     task = {
         "id": uuid.uuid4().hex[:8],
@@ -62,6 +79,8 @@ def add_task(title: str, category: str = "", due: str = "", notes: str = "", sou
         "due": due,
         "notes": notes,
         "source": source,
+        "difficulty": difficulty,
+        "hours": hours,
         "done": False,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -92,7 +111,14 @@ def list_tasks(scope: str = "all", include_done: bool = False) -> str:
         return True
 
     filtered = [t for t in _load() if matches(t)]
-    filtered.sort(key=lambda t: (_parse_due(t["due"]) is None, _parse_due(t["due"]) or now))
+    filtered.sort(
+        key=lambda t: (
+            _parse_due(t["due"]) is None,
+            _parse_due(t["due"]) or now,
+            -t.get("difficulty", 0),
+            -t.get("hours", 0),
+        )
+    )
 
     if not filtered:
         return f"Nothing in '{scope}'."
@@ -123,8 +149,16 @@ def delete_task(task_id: str) -> str:
 
 
 @mcp.tool()
-def update_task(task_id: str, title: str = "", category: str = "", due: str = "", notes: str = "") -> str:
-    """Update fields of an existing task. Leave a field blank to keep its current value."""
+def update_task(
+    task_id: str,
+    title: str = "",
+    category: str = "",
+    due: str = "",
+    notes: str = "",
+    difficulty: int = 0,
+    hours: float = 0,
+) -> str:
+    """Update fields of an existing task. Leave a field at its default (blank/0) to keep its current value."""
     tasks = _load()
     for t in tasks:
         if t["id"] == task_id:
@@ -136,6 +170,10 @@ def update_task(task_id: str, title: str = "", category: str = "", due: str = ""
                 t["due"] = due
             if notes:
                 t["notes"] = notes
+            if difficulty:
+                t["difficulty"] = difficulty
+            if hours:
+                t["hours"] = hours
             _save(tasks)
             return "Updated " + _format(t, datetime.now(timezone.utc))
     return f"No task with id {task_id}"
