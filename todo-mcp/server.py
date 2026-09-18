@@ -32,11 +32,14 @@ def _save(tasks: list[dict]) -> None:
 
 
 def _parse_due(due: str) -> datetime | None:
+    """A naive due ('2026-09-17T17:00') is read as LOCAL time, not UTC — due
+    dates are typed by a human thinking in their own timezone, not the
+    server's. (Same bug the course's first-instrument server.py flags.)"""
     if not due:
         return None
     d = datetime.fromisoformat(due)
     if d.tzinfo is None:
-        d = d.replace(tzinfo=timezone.utc)
+        d = d.replace(tzinfo=datetime.now().astimezone().tzinfo)
     return d
 
 
